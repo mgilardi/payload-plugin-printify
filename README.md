@@ -20,7 +20,7 @@ Connects a [Printify](https://printify.com) shop to a store built with Payload's
 - **Printify → orders.** Order and shipment webhooks update `fulfillment` on the order
   (status, carrier, tracking number and URL).
 
-It depends only on `payload` (peer) and Node's `crypto`. Status: 0.x, API may still change.
+It depends only on `payload` (peer) and Node's `crypto`. **Status: beta (0.x).** Product sync, webhooks and checkout are in use; order submission is covered by tests against a simulated Printify until its first real orders. The API may still change before 1.0.
 
 ## Install
 
