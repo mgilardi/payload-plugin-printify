@@ -6,6 +6,7 @@ import { submitOrderHook } from './orders'
 import { productFromPriceHook, pushVariantPriceHook } from './prices'
 import { storeScope, syncPrintifyProduct, unpublishPrintifyProduct } from './sync'
 import type { PrintifyPluginOptions, ResolvedPrintifyOptions } from './types'
+import { pushVisibilityHook } from './visibility'
 import { webhookEndpoint } from './webhook'
 
 export type { PrintifyPluginOptions } from './types'
@@ -33,6 +34,7 @@ const resolve = (o: PrintifyPluginOptions): ResolvedPrintifyOptions => ({
   sendToProduction: o.sendToProduction ?? false,
   publishHandshake: o.publishHandshake ?? false,
   pushPrices: o.pushPrices ?? false,
+  pushVisibility: o.pushVisibility ?? false,
   currency: o.currency ?? 'USD',
   shippingMethod: o.shippingMethod ?? 1,
   webhookPath: o.webhookPath ?? '/printify/webhook',
@@ -58,7 +60,11 @@ export const printifyPlugin =
     const opts = resolve(options)
     const extend = (c: CollectionConfig): CollectionConfig => {
       if (c.slug === opts.collections.products)
-        return { ...c, fields: [...productContentFields(c), ...c.fields, productPrintifyField] }
+        return {
+          ...c,
+          fields: [...productContentFields(c), ...c.fields, productPrintifyField],
+          hooks: { ...c.hooks, beforeChange: [...(c.hooks?.beforeChange ?? []), pushVisibilityHook(opts)] },
+        }
       if (c.slug === opts.collections.variants)
         return {
           ...c,

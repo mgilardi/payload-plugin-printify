@@ -18,6 +18,13 @@ export type PrintifyPluginOptions = {
    */
   pushPrices?: boolean
   /**
+   * Publishing or unpublishing a synced product in Payload publishes or
+   * unpublishes it in Printify too (Printify's own `visible` flag is
+   * read-only; it follows). Default false: Printify's visibility wins and is
+   * copied on each sync.
+   */
+  pushVisibility?: boolean
+  /**
    * The shop's sales channel is Printify's "API" channel and this store is it:
    * answer Printify's publish events (publishing_succeeded / _failed with the
    * product URL). Leave off for shops on other channels (Pop-Up Store, Etsy,
@@ -37,11 +44,11 @@ export type PrintifyPluginOptions = {
   tenant?: { field?: string; resolve: (payload: Payload) => Promise<number | string | null> }
   /**
    * Called right before the plugin changes anything in Printify: sending an
-   * order (it costs money) or pushing a price. Throw to block it. A blocked
-   * order is marked "held" with the error message; a blocked price edit is
-   * refused. Use it to keep staging/test copies away from a real shop.
+   * order (it costs money), pushing a price or a publish/unpublish. Throw to
+   * block it. A blocked order is marked "held" with the error message; a
+   * blocked price or visibility change is refused. Use it to keep staging/test copies away from a real shop.
    */
-  beforePrintifyWrite?: (args: { action: 'order' | 'price'; doc: Record<string, unknown>; req: PayloadRequest }) => void | Promise<void>
+  beforePrintifyWrite?: (args: { action: 'order' | 'price' | 'visibility'; doc: Record<string, unknown>; req: PayloadRequest }) => void | Promise<void>
   /** Public URL of a product page, reported to Printify after publishing. */
   productURL?: (product: { id: string; slug: string }) => string
   /** Endpoint path under /api (default /printify/webhook). */
@@ -53,7 +60,7 @@ export type PrintifyPluginOptions = {
 }
 
 export type ResolvedPrintifyOptions = Required<
-  Pick<PrintifyPluginOptions, 'sendToProduction' | 'publishHandshake' | 'pushPrices' | 'currency' | 'shippingMethod' | 'webhookPath'>
+  Pick<PrintifyPluginOptions, 'sendToProduction' | 'publishHandshake' | 'pushPrices' | 'pushVisibility' | 'currency' | 'shippingMethod' | 'webhookPath'>
 > &
   Omit<PrintifyPluginOptions, 'collections'> & {
     enabled: boolean

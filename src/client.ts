@@ -121,6 +121,21 @@ export class PrintifyClient {
     body: Partial<{ title: string; description: string; variants: { id: number; price: number; is_enabled: boolean }[] }>,
   ) => this.request<PrintifyProduct>('PUT', `/shops/${shopId}/products/${id}.json`, body)
 
+  /** Publish to the shop's sales channel (Printify's own channels act on it; API shops get product:publish:started). */
+  publish = (shopId: number | string, id: string) =>
+    this.request('POST', `/shops/${shopId}/products/${id}/publish.json`, {
+      title: true,
+      description: true,
+      images: true,
+      variants: true,
+      tags: true,
+      keyFeatures: true,
+      shipping_template: true,
+    })
+
+  /** Mark a product unpublished (hidden from the sales channel). */
+  unpublish = (shopId: number | string, id: string) => this.request('POST', `/shops/${shopId}/products/${id}/unpublish.json`, {})
+
   publishingSucceeded = (shopId: number | string, id: string, external: { id: string; handle: string }) =>
     this.request('POST', `/shops/${shopId}/products/${id}/publishing_succeeded.json`, { external })
 

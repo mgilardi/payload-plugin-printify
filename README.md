@@ -1,6 +1,4 @@
-# payload-plugin-printify
-
-Printify print-on-demand for [Payload](https://payloadcms.com) 3.
+# Printify plugin for Payload ecommerce
 
 Connects a [Printify](https://printify.com) shop to a store built with Payload's official
 [ecommerce plugin](https://payloadcms.com/docs/ecommerce/overview):
@@ -14,23 +12,23 @@ Connects a [Printify](https://printify.com) shop to a store built with Payload's
 - **Prices → Printify (optional).** With `pushPrices: true`, a price edited on a synced variant
   in Payload is written to the Printify product first; if Printify refuses (product locked
   while publishing, API error, your guard), the edit is refused, so the two never disagree.
+- **Visibility, both ways.** Hidden Printify products are imported as drafts; visible ones are
+  published. With `pushVisibility: true`, Publish/Unpublish on a synced product in Payload also
+  publishes/unpublishes it in Printify first (refused if Printify refuses). "Save draft" does not.
 - **Orders → Printify.** When an order becomes paid (`status: processing`), its Printify items are
   sent as a Printify order (`external_id` = your order id). Orders wait in Printify for approval
   unless `sendToProduction: true`.
 - **Printify → orders.** Order and shipment webhooks update `fulfillment` on the order
   (status, carrier, tracking number and URL).
 
-It depends only on `payload` (peer) and Node's `crypto`. **Status: beta (0.x).** Product sync, webhooks and checkout are in use; order submission is covered by tests against a simulated Printify until its first real orders. The API may still change before 1.0.
+Self-contained: it depends only on `payload` and Node's `crypto`; this folder can be published as
+its own package.
 
 ## Install
 
-```sh
-npm install payload-plugin-printify
-```
-
 ```ts
 import { ecommercePlugin } from '@payloadcms/plugin-ecommerce'
-import { printifyPlugin } from 'payload-plugin-printify'
+import { printifyPlugin } from './plugins/printify'
 
 export default buildConfig({
   plugins: [
@@ -43,6 +41,7 @@ export default buildConfig({
       // Optional:
       // sendToProduction: true,
       // pushPrices: true,
+      // pushVisibility: true,
       // publishHandshake: true,                                          // shop on the API sales channel
       // beforePrintifyWrite: ({ action, doc, req }) => { if (!isProduction) throw new Error('staging only reads Printify') },
       // currency: 'USD',                                                 // priceIn<currency> fields
@@ -77,7 +76,7 @@ and the endpoint `POST /api/printify/webhook`, which rejects requests without a 
 ## Staging copies
 
 Staging and production usually read the same Printify shop. Pass `beforePrintifyWrite` and
-throw outside production: orders are then marked `held` and price edits are refused, while
+throw outside production: orders are then marked `held` and price and visibility edits are refused, while
 product sync (read-only on Printify) keeps working everywhere.
 
 ## Notes
@@ -90,17 +89,3 @@ product sync (read-only on Printify) keeps working everywhere.
 - Mockups are linked from Printify's CDN, not copied into uploads.
 - Shipping cost for a cart: `new PrintifyClient(token).shippingCost(shopId, { line_items, address_to })`.
 - API limits: 600 requests/minute; the client retries 429/5xx with backoff.
-
-## Development
-
-```sh
-npm install
-npm run typecheck && npm test && npm run build
-```
-
-Issues and pull requests are welcome. Please include a test for behavior changes; tests use a
-fake `fetch` (option `fetch`) instead of the real Printify API.
-
-## License
-
-MIT

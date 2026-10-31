@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 import { mapPrintifyProduct, printifyPlugin, validPrintifySignature, type PrintifyProduct } from '../src'
 import { pushVariantPriceHook } from '../src/prices'
+import { pushVisibilityHook } from '../src/visibility'
 import type { PrintifyPluginOptions, ResolvedPrintifyOptions } from '../src/types'
 import { webhookEndpoint } from '../src/webhook'
 
@@ -90,9 +91,10 @@ describe('config', () => {
     expect(names('variants')).toContain('printify')
     expect(names('orders')).toContain('fulfillment')
     expect(bySlug.variants!.hooks?.beforeChange).toHaveLength(1)
+    expect(bySlug.products!.hooks?.beforeChange).toHaveLength(1)
     expect(bySlug.orders!.hooks?.afterChange).toHaveLength(1)
     expect(config.endpoints?.map((e) => e.path)).toEqual(['/printify/webhook'])
-    expect(config.custom.printify).toMatchObject({ enabled: true, pushPrices: false, publishHandshake: false, currency: 'USD' })
+    expect(config.custom.printify).toMatchObject({ enabled: true, pushPrices: false, pushVisibility: false, publishHandshake: false, currency: 'USD' })
   })
 
   it('is off without a token and shop id', () => {
@@ -135,5 +137,48 @@ describe('price push', () => {
     await run({ fetch: fake.fetch }, 2500)
     await run({ fetch: fake.fetch, pushPrices: false }, 2300)
     expect(fake.puts).toHaveLength(0)
+  })
+})
+
+describe('visibility push', () => {
+  const product = { id: 'p1', _status: 'published', printify: { productId: 'pf-1' } }
+  const calls = (product: PrintifyProduct) => {
+    const posts: string[] = []
+    const fetch = (async (url: string, init?: RequestInit) => {
+      if (init?.method === 'POST') posts.push(url)
+      return new Response(JSON.stringify(product), { status: 200 })
+    }) as typeof globalThis.fetch
+    return { posts, fetch }
+  }
+  const run = (options: PrintifyPluginOptions, status: string, original = product, query: Record<string, unknown> = {}, context: Record<string, unknown> = {}) => {
+    const hook = pushVisibilityHook(configure({ apiToken: 't', shopId: '123', pushVisibility: true, ...options }).custom.printify)
+    return hook({ data: { _status: status }, originalDoc: original, operation: 'update', req: { query } as PayloadRequest, context } as never)
+  }
+
+  it('unpublishes and publishes in Printify', async () => {
+    const fake = calls(tee())
+    await run({ fetch: fake.fetch }, 'draft')
+    await run({ fetch: fake.fetch }, 'published', { ...product, _status: 'draft' })
+    expect(fake.posts).toEqual([
+      'https://api.printify.com/v1/shops/123/products/pf-1/unpublish.json',
+      'https://api.printify.com/v1/shops/123/products/pf-1/publish.json',
+    ])
+  })
+
+  it('leaves draft saves, unchanged status, sync writes and disabled pushes alone', async () => {
+    const fake = calls(tee())
+    await run({ fetch: fake.fetch }, 'draft', product, { draft: 'true' })
+    await run({ fetch: fake.fetch }, 'published')
+    await run({ fetch: fake.fetch }, 'draft', product, {}, { printify: true })
+    await run({ fetch: fake.fetch, pushVisibility: false }, 'draft')
+    expect(fake.posts).toHaveLength(0)
+  })
+
+  it('refuses the change when the guard blocks it or the product is locked', async () => {
+    const fake = calls(tee())
+    await expect(run({ fetch: fake.fetch, beforePrintifyWrite: () => { throw new Error('staging only reads Printify') } }, 'draft')).rejects.toThrow(/staging/)
+    const locked = calls(tee({ is_locked: true }))
+    await expect(run({ fetch: locked.fetch }, 'draft')).rejects.toThrow(/publishing/)
+    expect(fake.posts.length + locked.posts.length).toBe(0)
   })
 })
